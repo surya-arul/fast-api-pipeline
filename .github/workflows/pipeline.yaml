@@ -8,25 +8,26 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Create .env file from example
+      - name: Create .env file
         run: cp .env.example .env
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install poetry
+          poetry install --only main
 
-      - name: Run lint or tests (optional)
+      - name: Deploy by restarting Docker
         run: |
-          echo "Running tests..."
-          # pytest
+          docker compose down || true
+          docker compose up -d --build
