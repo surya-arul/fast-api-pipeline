@@ -1,41 +1,48 @@
+# ============================================
 # Stage 1: Builder
-FROM python:3.12 as builder
+# ============================================
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# Update apt
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y curl && \
+# Install system dependencies
+RUN apt-get update && apt-get install -y curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Install poetry
+# Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
-ENV PATH="/root/.local/bin:$PATH"
+ENV PATH="/root/.local/bin:${PATH}"
 
-# Copy poetry files
+# Copy project dependency files
 COPY pyproject.toml poetry.lock* ./
 
-# Install dependencies to virtual environment
+# Install only production dependencies inside a .venv folder
 RUN poetry config virtualenvs.in-project true && \
     poetry install --no-interaction --no-ansi --only main
 
+# ============================================
 # Stage 2: Runtime
+# ============================================
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy virtual environment from builder
+# Copy Python virtual environment from builder
 COPY --from=builder /app/.venv /app/.venv
 
-ENV PATH="/app/.venv/bin:$PATH"
-ENV PORT=8000
+# Add .venv into PATH
+ENV PATH="/app/.venv/bin:${PATH}"
+
+# Allow dynamic PORT passed from docker-compose / env
+ARG PORT=8000
+ENV PORT=${PORT}
 
 # Copy application code
 COPY . .
 
-# Expose port
+# Expose port dynamically (Docker runtime will override)
 EXPOSE ${PORT}
 
-# Run application with uvicorn
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+# Start FastAPI
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
