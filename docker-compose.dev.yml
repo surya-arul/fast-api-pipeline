@@ -1,0 +1,21 @@
+services:
+  fastapi:
+    build:
+      context: .
+      target: dev          # must match AS runtime in Dockerfile
+      args:
+        - PORT=${PORT}
+    volumes:
+      - .:/app                 # live code sync for hot reload
+    container_name: fastapi-dev
+    env_file:
+      - .env
+    ports:
+      - "${PORT}:${PORT}"
+      - 5678:5678              # debugpy port
+    environment:
+      - PORT=${PORT}
+    command: >
+      python -m debugpy --listen 0.0.0.0:5678 --wait-for-client
+      -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --reload
+    restart: "no"

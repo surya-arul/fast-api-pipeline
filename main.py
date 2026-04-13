@@ -14,9 +14,11 @@ app = FastAPI(
 
 @app.get("/", tags=["Root"])
 async def read_root():
+    final_message = os.getenv("WELCOME_MESSAGE", "Welcome to the Fast API Pipeline!")
+    print(f"Environment variable WELCOME_MESSAGE: {final_message}")
     return JSONResponse(
         status_code=200,
-        content={"message": os.getenv("WELCOME_MESSAGE", "Welcome to the Fast API Pipeline!")}
+        content={"message": final_message}
     )
 
 
@@ -26,3 +28,9 @@ async def health_check():
         status_code=200,
         content={"status": "healthy"}
     )
+    
+@app.get("/heavy")
+async def heavy():
+    # Simulate CPU work
+    total = sum(i * i for i in range(100000))
+    return {"result": total}

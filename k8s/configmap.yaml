@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fastapi-config
+data:
+  WELCOME_MESSAGE: "Hello from Kubernetes!"
+  PORT: "8100"

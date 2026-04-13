@@ -3,36 +3,39 @@
 # ============================================
 FROM python:3.12-slim AS builder
 
-WORKDIR /app
+WORKDIR /build
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 -
+RUN pip install --no-cache-dir poetry
 
-ENV PATH="/root/.local/bin:${PATH}"
+RUN poetry self add poetry-plugin-export
 
 # Copy project dependency files
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml poetry.lock ./
 
-# Install only production dependencies inside a .venv folder
-RUN poetry config virtualenvs.in-project true && \
-    poetry install --no-interaction --no-ansi --only main
+# Export prod deps
+RUN poetry export -f requirements.txt --output requirements.txt
+
+# Export prod + dev deps (includes debugpy)
+RUN poetry export -f requirements.txt --with dev --output requirements-dev.txt
 
 # ============================================
-# Stage 2: Runtime
+# Stage 2: Runtime (prod base)
 # ============================================
-FROM python:3.12-slim
+FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
 # Copy Python virtual environment from builder
-COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /build/requirements.txt .
 
-# Add .venv into PATH
-ENV PATH="/app/.venv/bin:${PATH}"
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Allow dynamic PORT passed from docker-compose / env
 ARG PORT=8000
@@ -45,4 +48,14 @@ COPY . .
 EXPOSE ${PORT}
 
 # Start FastAPI
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+
+# ============================================
+# Stage 3: Dev (extends runtime, adds debugpy)
+# ============================================
+FROM runtime AS dev
+
+COPY --from=builder /build/requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# CMD is overridden by docker-compose.debug.yml anyway
